@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Bullet Hell Shooter</title>
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    background: black;
+}
+canvas {
+    display: block;
+    margin: auto;
+    background: #111;
+}
+</style>
+</head>
+<body>
+
+<canvas id="game" width="480" height="640"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const keys = {};
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height - 80,
+    speed: 5,
+    radius: 5,
+    hp: 3
+};
+
+const shots = [];
+const bullets = [];
+
+const boss = {
+    x: canvas.width / 2,
+    y: 100,
+    hp: 200,
+    timer: 0
+};
+
+function shoot() {
+    shots.push({
+        x: player.x,
+        y: player.y,
+        vy: -8
+    });
+}
+
+setInterval(() => {
+    if (
+        keys["z"] ||
+        keys["Z"] ||
+        touching
+    ) {
+        shoot();
+    }
+}, 120);
+
+function update() {
+
+    if(keys["ArrowLeft"]) player.x -= player.speed;
+    if(keys["ArrowRight"]) player.x += player.speed;
+    if(keys["ArrowUp"]) player.y -= player.speed;
+    if(keys["ArrowDown"]) player.y += player.speed;
+
+    player.x = Math.max(0, Math.min(canvas.width, player.x));
+    player.y = Math.max(0, Math.min(canvas.height, player.y));
+
+    shots.forEach(s => s.y += s.vy);
+
+    for(let i = shots.length - 1; i >= 0; i--) {
+        const s = shots[i];
+
+        let dx = s.x - boss.x;
+        let dy = s.y - boss.y;
+
+        if(Math.sqrt(dx*dx + dy*dy) < 30) {
+            boss.hp--;
+            shots.splice(i,1);
+            continue;
+        }
+
+        if(s.y < 0) shots.splice(i,1);
+    }
+
+    boss.timer++;
+
+    if(boss.timer % 20 === 0) {
+
+        const count = 24;
+
+        for(let i=0;i<count;i++) {
+            const angle = Math.PI * 2 * i / count;
+
+            bullets.push({
+                x: boss.x,
+                y: boss.y,
+                vx: Math.cos(angle) * 2,
+                vy: Math.sin(angle) * 2,
+                radius: 6
+            });
+        }
+    }
+
+    bullets.forEach(b => {
+        b.x += b.vx;
+        b.y += b.vy;
+    });
+
+    for(let i = bullets.length-1; i>=0; i--) {
+
+        const b = bullets[i];
+
+        const dx = b.x - player.x;
+        const dy = b.y - player.y;
+
+        const dist = Math.sqrt(dx*dx + dy*dy);
+
+        if(dist < b.radius + player.radius) {
+            player.hp--;
+            bullets.splice(i,1);
+
+            if(player.hp <= 0) {
+                alert("GAME OVER");
+                location.reload();
+            }
+            continue;
+        }
+
+        if(
+            b.x < -20 ||
+            b.x > canvas.width + 20 ||
+            b.y < -20 ||
+            b.y > canvas.height + 20
+        ){
+            bullets.splice(i,1);
+        }
+    }
+
+    if(boss.hp <= 0) {
+        alert("YOU WIN!");
+        location.reload();
+    }
+}
+
+function draw() {
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    // プレイヤー
+    ctx.fillStyle = "cyan";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 8, 0, Math.PI*2);
+    ctx.fill();
+
+    // 当たり判定
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, 2, 0, Math.PI*2);
+    ctx.fill();
+
+    // ショット
+    ctx.fillStyle = "yellow";
+    shots.forEach(s => {
+        ctx.fillRect(s.x-2,s.y-8,4,8);
+    });
+
+    // ボス
+    ctx.fillStyle = "red";
+    ctx.beginPath();
+    ctx.arc(boss.x,boss.y,30,0,Math.PI*2);
+    ctx.fill();
+
+    // ボスHP
+    ctx.fillStyle = "white";
+    ctx.fillText("Boss HP: " + boss.hp, 10, 20);
+
+    // 自機HP
+    ctx.fillText("Player HP: " + player.hp, 10, 40);
+
+    // 弾幕
+    ctx.fillStyle = "magenta";
+    bullets.forEach(b => {
+        ctx.beginPath();
+        ctx.arc(b.x,b.y,b.radius,0,Math.PI*2);
+        ctx.fill();
+    });
+}
+
+let touching = false;
+
+canvas.addEventListener("touchstart", e => {
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+
+    player.x = touch.clientX - rect.left;
+    player.y = touch.clientY - rect.top;
+
+    touching = true;
+
+}, { passive:false });
+
+canvas.addEventListener("touchmove", e => {
+    e.preventDefault();
+
+    const touch = e.touches[0];
+    const rect = canvas.getBoundingClientRect();
+
+    player.x = touch.clientX - rect.left;
+    player.y = touch.clientY - rect.top;
+
+}, { passive:false });
+
+canvas.addEventListener("touchend", () => {
+    touching = false;
+});
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
