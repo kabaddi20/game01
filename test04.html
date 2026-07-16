@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Bullet Hell</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js">
+</script>
+</head>
+
+<style>
+body{
+    margin:0;
+    overflow:hidden;
+    background:black;
+}
+</style>
+
+</head>
+<body>
+
+<script>
+
+const WIDTH = 480;
+const HEIGHT = 640;
+
+let player;
+let boss;
+
+let playerBullets = [];
+let enemyBullets = [];
+
+let scoreText;
+let hpText;
+
+let score = 0;
+let bossHp = 300;
+
+let angle = 0;
+
+const config = {
+
+    type: Phaser.AUTO,
+
+    width: WIDTH,
+
+    height: HEIGHT,
+
+    backgroundColor: "#000000",
+
+    scene: {
+
+        create: create,
+
+        update: update
+    }
+};
+
+new Phaser.Game(config);
+
+function create() {
+
+    player = this.add.rectangle(
+        WIDTH / 2,
+        HEIGHT - 80,
+        20,
+        20,
+        0x00ffff
+    );
+
+    boss = this.add.rectangle(
+        WIDTH / 2,
+        120,
+        60,
+        60,
+        0xff0000
+    );
+
+    scoreText = this.add.text(
+        10,
+        10,
+        "Score: 0",
+        {fontSize:"20px"}
+    );
+
+    hpText = this.add.text(
+        10,
+        40,
+        "Boss HP: 300",
+        {fontSize:"20px"}
+    );
+
+    // 自機弾
+
+    this.time.addEvent({
+
+        delay:100,
+
+        loop:true,
+
+        callback:()=>{
+
+            const bullet =
+                this.add.rectangle(
+                    player.x,
+                    player.y,
+                    4,
+                    10,
+                    0xffff00
+                );
+
+            bullet.vy = -8;
+
+            playerBullets.push(bullet);
+        }
+    });
+
+
+    // 二重螺旋弾幕
+
+    this.time.addEvent({
+
+        delay:50,
+
+        loop:true,
+
+        callback:()=>{
+
+            if(bossHp <= 0) return;
+
+            for(let i=0;i<4;i++){
+
+                const rad1 =
+                    angle +
+                    i * Math.PI / 2;
+
+                const rad2 =
+                    -angle +
+                    i * Math.PI / 2;
+
+                createEnemyBullet(
+                    this,
+                    rad1,
+                    0xff00ff
+                );
+
+                createEnemyBullet(
+                    this,
+                    rad2,
+                    0xffffff
+                );
+            }
+
+            angle += 0.08;
+        }
+    });
+
+}
+
+function createEnemyBullet(scene, rad, color){
+
+    const bullet =
+        scene.add.circle(
+            boss.x,
+            boss.y,
+            4,
+            color
+        );
+
+    bullet.vx =
+        Math.cos(rad) * 3;
+
+    bullet.vy =
+        Math.sin(rad) * 3;
+
+    enemyBullets.push(bullet);
+}
+
+function update() {
+
+    if(this.input.activePointer.isDown){
+
+        player.x =
+            this.input.activePointer.x;
+
+        player.y =
+            this.input.activePointer.y;
+    }
+
+    // ボス左右移動
+
+    if(bossHp > 0){
+
+        boss.x += Math.sin(
+            this.time.now / 500
+        ) * 2;
+    }
+
+    // 自機弾
+
+    for(let i=playerBullets.length-1;i>=0;i--){
+
+        const b = playerBullets[i];
+
+        b.y += b.vy;
+
+        if(b.y < -20){
+
+            b.destroy();
+
+            playerBullets.splice(i,1);
+
+            continue;
+        }
+
+        if(
+            bossHp > 0 &&
+            Phaser.Geom.Intersects.RectangleToRectangle(
+                b.getBounds(),
+                boss.getBounds()
+            )
+        ){
+
+            bossHp--;
+
+            score += 10;
+
+            hpText.setText(
+                "Boss HP: " + bossHp
+            );
+
+            scoreText.setText(
+                "Score: " + score
+            );
+
+            b.destroy();
+
+            playerBullets.splice(i,1);
+
+            if(bossHp <= 0){
+
+                boss.destroy();
+
+                hpText.setText(
+                    "Boss Defeated!"
+                );
+            }
+        }
+    }
+
+    // 敵弾
+
+    for(let i=enemyBullets.length-1;i>=0;i--){
+
+        const b = enemyBullets[i];
+
+        b.x += b.vx;
+        b.y += b.vy;
+
+        if(
+            b.x < -20 ||
+            b.x > WIDTH+20 ||
+            b.y < -20 ||
+            b.y > HEIGHT+20
+        ){
+
+            b.destroy();
+
+            enemyBullets.splice(i,1);
+
+            continue;
+        }
+
+        const dx =
+            b.x - player.x;
+
+        const dy =
+            b.y - player.y;
+
+        const dist =
+            Math.sqrt(dx*dx+dy*dy);
+
+        // 小さい当たり判定
+        if(dist < 6){
+
+            this.scene.restart();
+
+            playerBullets = [];
+            enemyBullets = [];
+
+            score = 0;
+            bossHp = 300;
+
+            return;
+        }
+    }
+}
+
+</script>
+
+</body>
+</html>
